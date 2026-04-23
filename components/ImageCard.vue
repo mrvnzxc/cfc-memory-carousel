@@ -5,13 +5,14 @@
         :src="image.file_url"
         :alt="image.file_name"
         loading="lazy"
-        class="h-full w-full object-cover"
+        class="h-full w-full cursor-zoom-in object-cover"
+        @click="emit('preview', image.id)"
       />
       <label
         v-if="selectable"
         class="absolute right-2 top-2 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-xs text-white"
       >
-        <input type="checkbox" :checked="selected" @change="emit('toggle', image.id)" />
+        <input type="checkbox" :checked="selected" @click.stop @change="emit('toggle', image.id)" />
         Select
       </label>
     </div>
@@ -32,5 +33,6 @@ defineProps<{
 
 const emit = defineEmits<{
   toggle: [id: string];
+  preview: [id: string];
 }>();
 </script>

@@ -84,6 +84,7 @@
             :selectable="true"
             :selected="selectedImages.includes(image.id)"
             @toggle="toggleSelection"
+            @preview="openPreview"
           />
         </div>
 
@@ -98,6 +99,7 @@
                 :selectable="true"
                 :selected="selectedImages.includes(image.id)"
                 @toggle="toggleSelection"
+                @preview="openPreview"
               />
             </div>
           </div>
@@ -105,6 +107,50 @@
       </div>
       </section>
     </main>
+    <div
+      v-if="currentPreviewImage"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-6"
+      @click.self="closePreview"
+    >
+      <button
+        type="button"
+        class="absolute right-3 top-3 rounded-full bg-white/20 px-3 py-1 text-white hover:bg-white/30"
+        @click="closePreview"
+      >
+        ✕
+      </button>
+      <button
+        type="button"
+        class="absolute left-2 rounded-full bg-white/20 px-3 py-2 text-xl text-white hover:bg-white/30 sm:left-4"
+        @click="previewPrevious"
+      >
+        &lt;
+      </button>
+      <button
+        type="button"
+        class="absolute right-2 rounded-full bg-white/20 px-3 py-2 text-xl text-white hover:bg-white/30 sm:right-4"
+        @click="previewNext"
+      >
+        &gt;
+      </button>
+      <div class="w-full max-w-5xl rounded-2xl bg-slate-900 p-3 sm:p-5">
+        <img
+          :src="currentPreviewImage.file_url"
+          :alt="currentPreviewImage.file_name"
+          class="max-h-[70vh] w-full rounded-lg object-contain"
+        />
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <p class="truncate text-sm text-slate-100">{{ currentPreviewImage.file_name }}</p>
+          <button
+            type="button"
+            class="rounded-lg border border-rose-300 px-3 py-2 text-sm text-rose-200 hover:bg-rose-900/30"
+            @click="deletePreviewImage"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
     <footer class="border-t border-slate-200 bg-white py-3 text-center text-xs text-slate-500 sm:text-sm">
       All rights reserved. Developed by John Marvin Bautista.
     </footer>
@@ -126,6 +172,7 @@ const images = ref<ImageRecord[]>([]);
 const selectedFolderId = ref("");
 const selectedImages = ref<string[]>([]);
 const newFolderName = ref("");
+const previewImageId = ref<string | null>(null);
 
 if (password.value) {
   await attemptAuth(password.value);
@@ -156,6 +203,21 @@ const groupedImages = computed(() => {
     folderName: folder.name,
     images: byFolder.get(folder.id) || []
   }));
+});
+
+const previewImages = computed(() =>
+  selectedFolderId.value ? filteredImages.value : images.value
+);
+
+const currentPreviewIndex = computed(() =>
+  previewImages.value.findIndex((image) => image.id === previewImageId.value)
+);
+
+const currentPreviewImage = computed(() => {
+  if (currentPreviewIndex.value < 0) {
+    return null;
+  }
+  return previewImages.value[currentPreviewIndex.value] || null;
 });
 
 async function login() {
@@ -198,6 +260,31 @@ function toggleSelection(id: string) {
     return;
   }
   selectedImages.value = [...selectedImages.value, id];
+}
+
+function openPreview(id: string) {
+  previewImageId.value = id;
+}
+
+function closePreview() {
+  previewImageId.value = null;
+}
+
+function previewNext() {
+  if (!previewImages.value.length || currentPreviewIndex.value < 0) {
+    return;
+  }
+  const nextIndex = (currentPreviewIndex.value + 1) % previewImages.value.length;
+  previewImageId.value = previewImages.value[nextIndex].id;
+}
+
+function previewPrevious() {
+  if (!previewImages.value.length || currentPreviewIndex.value < 0) {
+    return;
+  }
+  const previousIndex =
+    (currentPreviewIndex.value - 1 + previewImages.value.length) % previewImages.value.length;
+  previewImageId.value = previewImages.value[previousIndex].id;
 }
 
 async function onCreateFolder() {
@@ -249,4 +336,42 @@ async function deleteSelectedImages() {
   await refreshImages();
   showToast("Selected images deleted", "success");
 }
+
+async function deletePreviewImage() {
+  if (!currentPreviewImage.value) {
+    return;
+  }
+  const deletingId = currentPreviewImage.value.id;
+  await api.deleteImages([deletingId], password.value);
+  selectedImages.value = selectedImages.value.filter((id) => id !== deletingId);
+  await refreshImages();
+  if (!previewImages.value.length) {
+    closePreview();
+    return;
+  }
+  const fallbackIndex = Math.min(currentPreviewIndex.value, previewImages.value.length - 1);
+  previewImageId.value = previewImages.value[fallbackIndex]?.id || null;
+  showToast("Image deleted", "success");
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (!currentPreviewImage.value) {
+    return;
+  }
+  if (event.key === "Escape") {
+    closePreview();
+  } else if (event.key === "ArrowRight") {
+    previewNext();
+  } else if (event.key === "ArrowLeft") {
+    previewPrevious();
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown);
+});
 </script>
