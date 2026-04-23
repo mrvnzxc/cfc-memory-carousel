@@ -10,7 +10,7 @@
         Cronasians, please select your department first, then upload your images.
       </p>
       <p class="mt-3 rounded-lg bg-slate-50 p-3 text-xs italic text-slate-600 sm:text-sm">
-        "Built for graduating Cronasians to share memories for our year-end collage and carousel."
+        "Please share your group photos with classmates, thesis defense moments, and other memorable snapshots."
       </p>
 
       <div class="mt-6">
