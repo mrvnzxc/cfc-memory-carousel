@@ -141,13 +141,22 @@
         />
         <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p class="truncate text-sm text-slate-100">{{ currentPreviewImage.file_name }}</p>
-          <button
-            type="button"
-            class="rounded-lg border border-rose-300 px-3 py-2 text-sm text-rose-200 hover:bg-rose-900/30"
-            @click="deletePreviewImage"
-          >
-            Delete
-          </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-100 hover:bg-slate-700/40"
+              @click="togglePreviewSelection"
+            >
+              {{ isCurrentPreviewSelected ? "Unselect" : "Select" }}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-rose-300 px-3 py-2 text-sm text-rose-200 hover:bg-rose-900/30"
+              @click="deletePreviewImage"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -163,7 +172,7 @@ import type { FolderRecord, ImageRecord } from "~/types/db";
 
 const api = useApi();
 const { showToast } = useToast();
-const { password, setPassword, clearPassword } = useAdmin();
+const { password, setPassword, clearPassword, isSessionValid } = useAdmin();
 
 const passwordInput = ref(password.value);
 const isAuthorized = ref(false);
@@ -220,6 +229,13 @@ const currentPreviewImage = computed(() => {
   return previewImages.value[currentPreviewIndex.value] || null;
 });
 
+const isCurrentPreviewSelected = computed(() => {
+  if (!currentPreviewImage.value) {
+    return false;
+  }
+  return selectedImages.value.includes(currentPreviewImage.value.id);
+});
+
 async function login() {
   await attemptAuth(passwordInput.value);
 }
@@ -242,6 +258,14 @@ function logout() {
   clearPassword();
   passwordInput.value = "";
   isAuthorized.value = false;
+}
+
+function expireSession() {
+  if (!isAuthorized.value) {
+    return;
+  }
+  logout();
+  showToast("Admin session expired. Please log in again.", "info");
 }
 
 async function refreshFolders() {
@@ -285,6 +309,13 @@ function previewPrevious() {
   const previousIndex =
     (currentPreviewIndex.value - 1 + previewImages.value.length) % previewImages.value.length;
   previewImageId.value = previewImages.value[previousIndex].id;
+}
+
+function togglePreviewSelection() {
+  if (!currentPreviewImage.value) {
+    return;
+  }
+  toggleSelection(currentPreviewImage.value.id);
 }
 
 async function onCreateFolder() {
@@ -367,11 +398,21 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+let sessionIntervalId: number | null = null;
+
 onMounted(() => {
+  sessionIntervalId = window.setInterval(() => {
+    if (!isSessionValid()) {
+      expireSession();
+    }
+  }, 15_000);
   window.addEventListener("keydown", onKeydown);
 });
 
 onBeforeUnmount(() => {
+  if (sessionIntervalId !== null) {
+    clearInterval(sessionIntervalId);
+  }
   window.removeEventListener("keydown", onKeydown);
 });
 </script>
