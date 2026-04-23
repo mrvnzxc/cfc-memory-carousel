@@ -152,6 +152,7 @@ async function uploadAll() {
   }
 
   uploading.value = false;
+  queued.value = queued.value.filter((item) => item.status !== "saved");
   showToast("Upload process finished.", "success");
 }
 
