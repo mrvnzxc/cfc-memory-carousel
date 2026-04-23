@@ -1,7 +1,12 @@
 const MAX_BYTES = 3 * 1024 * 1024;
 
 export async function compressImage(file: File): Promise<File> {
-  if (file.size <= MAX_BYTES && file.type === "image/webp") {
+  if (file.size <= MAX_BYTES) {
+    return file;
+  }
+
+  const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+  if (!allowedTypes.has(file.type)) {
     return file;
   }
 
@@ -19,18 +24,23 @@ export async function compressImage(file: File): Promise<File> {
   canvas.height = Math.round(bitmap.height * scale);
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 
+  const outputType = file.type;
   let quality = 0.85;
-  let blob = await canvasToBlob(canvas, "image/webp", quality);
+  let blob = await canvasToBlob(canvas, outputType, quality);
 
-  while (blob.size > MAX_BYTES && quality > 0.5) {
-    quality -= 0.1;
-    blob = await canvasToBlob(canvas, "image/webp", quality);
+  // PNG compression is lossless in canvas, so repeated quality reduction won't help.
+  if (outputType !== "image/png") {
+    while (blob.size > MAX_BYTES && quality > 0.5) {
+      quality -= 0.1;
+      blob = await canvasToBlob(canvas, outputType, quality);
+    }
   }
 
-  return new File([blob], file.name.replace(/\.[a-z0-9]+$/i, ".webp"), {
-    type: "image/webp",
-    lastModified: Date.now()
-  });
+  if (blob.size > MAX_BYTES) {
+    return file;
+  }
+
+  return new File([blob], file.name, { type: outputType, lastModified: Date.now() });
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
