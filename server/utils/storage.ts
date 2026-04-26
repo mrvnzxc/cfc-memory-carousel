@@ -1,6 +1,10 @@
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { requireEnv } from "./env";
 
 let cachedClient: S3Client | null = null;
@@ -73,4 +77,20 @@ export async function deleteFromStorage(storageKey: string) {
   });
 
   await getS3Client().send(command);
+}
+
+export async function getObjectBuffer(storageKey: string): Promise<Buffer> {
+  const storage = getStorageConfig();
+  const command = new GetObjectCommand({
+    Bucket: storage.bucketName,
+    Key: storageKey
+  });
+
+  const response = await getS3Client().send(command);
+  if (!response.Body) {
+    throw new Error("Empty response body from storage");
+  }
+
+  const bytes = await response.Body.transformToByteArray();
+  return Buffer.from(bytes);
 }

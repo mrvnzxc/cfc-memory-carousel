@@ -5,6 +5,8 @@
         :src="image.file_url"
         :alt="image.file_name"
         loading="lazy"
+        decoding="async"
+        fetchpriority="low"
         class="h-full w-full cursor-zoom-in object-cover"
         @click="emit('preview', image.id)"
       />

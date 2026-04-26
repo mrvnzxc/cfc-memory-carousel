@@ -167,7 +167,6 @@
 </template>
 
 <script setup lang="ts">
-import JSZip from "jszip";
 import type { FolderRecord, ImageRecord } from "~/types/db";
 
 definePageMeta({
@@ -348,26 +347,43 @@ async function onCreateFolder() {
 }
 
 async function downloadZip() {
-  const zip = new JSZip();
-  const selected = images.value.filter((image) =>
-    selectedImages.value.includes(normalizeImageId(image.id))
-  );
+  if (!selectedImages.value.length) {
+    showToast("No images selected", "error");
+    return;
+  }
 
-  await Promise.all(
-    selected.map(async (image) => {
-      const response = await fetch(image.file_url);
-      const blob = await response.blob();
-      zip.file(image.file_name, blob);
-    })
-  );
+  try {
+    const blob = await $fetch<Blob>("/api/admin-download-zip", {
+      method: "POST",
+      body: { imageIds: selectedImages.value },
+      headers: { "x-admin-password": password.value },
+      responseType: "blob"
+    });
 
-  const blob = await zip.generateAsync({ type: "blob" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `images-${Date.now()}.zip`;
-  link.click();
-  URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `images-${Date.now()}.zip`;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast("ZIP download started", "success");
+  } catch (error: unknown) {
+    const err = error as {
+      data?: { statusMessage?: string; message?: string };
+      statusMessage?: string;
+      message?: string;
+    };
+    const msg =
+      err?.data?.statusMessage ||
+      err?.data?.message ||
+      err?.statusMessage ||
+      err?.message ||
+      "ZIP download failed";
+    showToast(msg, "error");
+  }
 }
 
 async function deleteSelectedImages() {
