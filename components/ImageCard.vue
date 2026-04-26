@@ -10,9 +10,10 @@
       />
       <label
         v-if="selectable"
-        class="absolute right-2 top-2 inline-flex items-center gap-1 rounded bg-black/60 px-2 py-1 text-xs text-white"
+        class="absolute right-2 top-2 z-10 inline-flex cursor-pointer select-none items-center gap-1 rounded bg-black/60 px-2 py-1 text-xs text-white"
+        @click.capture.stop.prevent="emit('toggle', image.id)"
       >
-        <input type="checkbox" :checked="selected" @click.stop @change="emit('toggle', image.id)" />
+        <input type="checkbox" tabindex="-1" :checked="!!selected" />
         Select
       </label>
     </div>

@@ -54,11 +54,11 @@
             Refresh
           </button>
           <button
-            class="w-full rounded-lg border border-rose-300 px-3 py-2 text-sm text-rose-700 disabled:opacity-50 sm:w-auto"
-            :disabled="!selectedFolderId"
-            @click="onDeleteFolder"
+            class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm sm:w-auto disabled:opacity-50"
+            :disabled="!filteredImages.length"
+            @click="selectAllVisible"
           >
-            Delete Selected Department
+            Select all
           </button>
           <button
             class="w-full rounded-lg bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-50 sm:w-auto"
@@ -82,7 +82,7 @@
             :key="image.id"
             :image="image"
             :selectable="true"
-            :selected="selectedImages.includes(image.id)"
+            :selected="isImageSelected(image)"
             @toggle="toggleSelection"
             @preview="openPreview"
           />
@@ -97,7 +97,7 @@
                 :key="image.id"
                 :image="image"
                 :selectable="true"
-                :selected="selectedImages.includes(image.id)"
+                :selected="isImageSelected(image)"
                 @toggle="toggleSelection"
                 @preview="openPreview"
               />
@@ -170,6 +170,10 @@
 import JSZip from "jszip";
 import type { FolderRecord, ImageRecord } from "~/types/db";
 
+definePageMeta({
+  ssr: false
+});
+
 const api = useApi();
 const { showToast } = useToast();
 const { password, setPassword, clearPassword, isSessionValid } = useAdmin();
@@ -233,7 +237,7 @@ const isCurrentPreviewSelected = computed(() => {
   if (!currentPreviewImage.value) {
     return false;
   }
-  return selectedImages.value.includes(currentPreviewImage.value.id);
+  return selectedImages.value.includes(normalizeImageId(currentPreviewImage.value.id));
 });
 
 async function login() {
@@ -278,12 +282,26 @@ async function refreshImages() {
   images.value = data;
 }
 
-function toggleSelection(id: string) {
-  if (selectedImages.value.includes(id)) {
-    selectedImages.value = selectedImages.value.filter((value) => value !== id);
+function normalizeImageId(id: string | number) {
+  return String(id);
+}
+
+function toggleSelection(id: string | number) {
+  const key = normalizeImageId(id);
+  if (selectedImages.value.includes(key)) {
+    selectedImages.value = selectedImages.value.filter((value) => value !== key);
     return;
   }
-  selectedImages.value = [...selectedImages.value, id];
+  selectedImages.value = [...selectedImages.value, key];
+}
+
+function selectAllVisible() {
+  const ids = filteredImages.value.map((image) => normalizeImageId(image.id));
+  selectedImages.value = [...ids];
+}
+
+function isImageSelected(image: ImageRecord) {
+  return selectedImages.value.includes(normalizeImageId(image.id));
 }
 
 function openPreview(id: string) {
@@ -329,20 +347,11 @@ async function onCreateFolder() {
   showToast("Department created", "success");
 }
 
-async function onDeleteFolder() {
-  if (!selectedFolderId.value) {
-    return;
-  }
-  await api.deleteFolder(selectedFolderId.value, password.value);
-  selectedFolderId.value = "";
-  await refreshFolders();
-  await refreshImages();
-  showToast("Department deleted", "success");
-}
-
 async function downloadZip() {
   const zip = new JSZip();
-  const selected = images.value.filter((image) => selectedImages.value.includes(image.id));
+  const selected = images.value.filter((image) =>
+    selectedImages.value.includes(normalizeImageId(image.id))
+  );
 
   await Promise.all(
     selected.map(async (image) => {
@@ -372,7 +381,7 @@ async function deletePreviewImage() {
   if (!currentPreviewImage.value) {
     return;
   }
-  const deletingId = currentPreviewImage.value.id;
+  const deletingId = normalizeImageId(currentPreviewImage.value.id);
   await api.deleteImages([deletingId], password.value);
   selectedImages.value = selectedImages.value.filter((id) => id !== deletingId);
   await refreshImages();
